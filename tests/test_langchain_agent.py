@@ -11,6 +11,7 @@ if HAS_LANGCHAIN:
     from agent_langchain.runtime import ask, build_agent
     from agent_langchain.tools import build_tools
     from agent_langchain.demo import DemoChatModel
+    from agent_langchain.knowledge import KnowledgeIndex
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langgraph.errors import GraphRecursionError
@@ -35,6 +36,33 @@ class LangChainAgentTests(unittest.TestCase):
         results = [event for event in reply["trace"] if event["type"] == "tool_result"]
         self.assertEqual({event["name"] for event in results}, {"calculator", "search_knowledge"})
         self.assertEqual(len(results), 2)
+        search = next(event for event in results if event["name"] == "search_knowledge")
+        self.assertEqual(json.loads(search["content"])["engine"], "llamaindex-bm25")
+
+    def test_llamaindex_ranks_relevant_document(self):
+        (self.root / "security.md").write_text("## 보안\n비밀정보 외부 입력 금지", encoding="utf-8")
+        index = KnowledgeIndex(self.root)
+        result = index.search("비밀정보")
+        self.assertEqual(result["matches"][0]["source"], "security.md")
+        self.assertGreater(result["matches"][0]["score"], 0)
+        self.assertTrue(result["matches"][0]["node_id"])
+
+    def test_llamaindex_refreshes_changes_and_deletions(self):
+        index = KnowledgeIndex(self.root)
+        first = index.search("휴가")
+        self.assertEqual(first, index.search("휴가"))
+        policy = self.root / "policy.md"
+        policy.write_text("## 휴가\n7영업일 전에 신청", encoding="utf-8")
+        self.assertIn("7영업일", index.search("휴가")["matches"][0]["content"])
+        policy.unlink()
+        self.assertEqual(index.search("휴가")["matches"], [])
+
+    def test_llamaindex_empty_and_invalid_corpus(self):
+        (self.root / "policy.md").write_text("### !!!", encoding="utf-8")
+        index = KnowledgeIndex(self.root)
+        self.assertEqual(index.search("휴가")["matches"], [])
+        self.assertEqual(index.search(" ")["matches"], [])
+        self.assertIn("error", index.search("a" * 2001))
 
     def test_tool_failure_returns_observation(self):
         reply = ask(self.agent, "1 / 0을 계산해줘")

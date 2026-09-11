@@ -1,8 +1,9 @@
-# LangChain 업무 지원 Agent
+# LangChain + LlamaIndex 업무 지원 Agent
 
 ## 목적과 설계
 
 사용자의 요청에 따라 사내 Markdown 문서를 검색하고 수식을 계산하는 실행 가능한 Agent입니다.
+LlamaIndex `MarkdownNodeParser`와 `BM25Retriever`가 문서 분할·인덱싱·검색을 담당합니다.
 LangChain `create_agent`가 모델 호출 → 도구 실행 → 결과 관찰 → 추가 도구 호출 또는 최종 답변을 관리합니다.
 공식 API: https://docs.langchain.com/oss/python/langchain/agents
 
@@ -11,13 +12,15 @@ flowchart LR
     U[사용자 / CLI] --> A[LangChain create_agent]
     A <--> M[실제 모델 또는 데모 모델]
     A <--> T[계산 / 문서 검색 도구]
-    T --> K[로컬 Markdown]
+    T <--> I[LlamaIndex BM25 인덱스]
+    I --> K[로컬 Markdown]
     A <--> S[세션별 메모리]
     A --> R[답변 / 출처 / 실행 기록]
 ```
 
 - `agent_langchain/runtime.py`: 모델 구성, 시스템 지침, 실행 제한, 세션 기억, 결과 정리
-- `agent_langchain/tools.py`: 수식 계산, 출처가 포함된 키워드 검색
+- `agent_langchain/tools.py`: 수식 계산, LlamaIndex 검색 도구 연결
+- `agent_langchain/knowledge.py`: Markdown 분할, BM25 인덱싱, 변경 감지, 출처·점수·노드 ID 반환
 - `agent_langchain/demo.py`: API 없이 재현 가능한 규칙 기반 테스트 모델
 - `agent_langchain/cli.py`: 단일 요청 및 대화형 실행
 
@@ -67,7 +70,13 @@ python -m agent_langchain --knowledge-dir ./knowledge '보안 정책을 찾아�
 메시지를 생략하면 대화 모드이며 `/exit`로 종료합니다. 세션 기억은 프로세스 안에서만 유지됩니다.
 새 프로세스에서 같은 세션 이름을 사용해도 이전 대화가 복원되지는 않습니다.
 문서는 지정 폴더의 최상위 `.md` 파일을 대상으로 검색합니다. 최대 100개, 파일당 1MB,
-상위 3개 문단을 반환합니다. 벡터 검색이 아닌 키워드 검색이므로 동의어·의미 검색에는 한계가 있습니다.
+총 5MB, 최대 4000개 청크를 인덱싱하고 상위 3개 결과를 반환합니다.
+LlamaIndex의 실제 BM25 검색이며 임베딩 모델을 사용한 의미 검색은 아닙니다.
+한국어를 포함한 Unicode 단어를 사용하고 영어 어간 처리는 끕니다. 한국어 형태소 분석은 하지 않으므로
+`휴가`, `보안`처럼 핵심 명사로 검색하는 것이 좋습니다. 동의어·조사 변형 검색에는 한계가 있습니다.
+검색 시 파일 내용 해시를 비교하여 추가·수정·삭제를 자동 반영합니다. 인덱스는 메모리에 캐시하며
+프로세스를 다시 시작하면 재구축합니다. 검색 결과에는 `engine: llamaindex-bm25`, 점수와 노드 ID가 포함됩니다.
+공식 검색 API: https://developers.llamaindex.ai/python/framework/integrations/retrievers/bm25_retriever/
 
 `--max-steps 12`는 모델·도구 그래프 단계의 상한이며 도구 호출 수와 동일하지 않습니다.
 수식은 길이를 제한하며 임의 코드 실행과 거듭제곱을 허용하지 않습니다.
@@ -87,7 +96,8 @@ python -m agent_native.evaluation
 ### 확인한 실행 결과
 
 - Python 3.14.6, LangChain 1.4.0, LangGraph 1.2.11, langchain-openai 1.6.2 환경에서 검증
-- 테스트 15개 통과(새 LangChain 통합 테스트 9개 + 기존 테스트 6개)
+- 테스트 18개 통과(LangChain·LlamaIndex 통합 테스트 12개 + 기존 테스트 6개)
 - 기존 Native Agent 평가 3/3 통과
 - 복합 요청 CLI에서 계산 결과 `5376`, 휴가 정책 및 `employee-handbook.md` 출처 확인
+- LlamaIndex core 0.14.24, BM25 retriever 0.6.5 환경에서 검색 순위·문서 변경·삭제·빈 문서 검증
 - 외부 LLM 호출은 API 키가 없는 환경이므로 미검증

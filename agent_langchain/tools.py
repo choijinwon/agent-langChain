@@ -1,16 +1,16 @@
 """Read-only tools; neither arbitrary Python nor shell commands are executed."""
 
 import math
-import re
 from pathlib import Path
 
 from langchain_core.tools import tool
 
 from agent_native.tools import ToolError, ToolRegistry
+from .knowledge import KnowledgeIndex
 
 
 def build_tools(knowledge_dir: Path):
-    root = knowledge_dir.expanduser().resolve()
+    index = KnowledgeIndex(knowledge_dir)
 
     @tool
     def calculator(expression: str) -> dict:
@@ -27,26 +27,7 @@ def build_tools(knowledge_dir: Path):
 
     @tool
     def search_knowledge(query: str) -> dict:
-        """Search local Markdown policies by keywords (e.g. 휴가). Return cited excerpts."""
-        tokens = set(re.findall(r"[\w가-힣]+", query.lower()))
-        if not tokens:
-            return {"matches": []}
-        matches = []
-        # Explicitly bounded, top-level Markdown corpus. Symlinks are excluded.
-        for path in sorted(root.glob("*.md"))[:100]:
-            if path.is_symlink() or not path.is_file():
-                continue
-            try:
-                if path.stat().st_size > 1_000_000:
-                    continue
-                content = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeError):
-                continue
-            for chunk in re.split(r"\n(?=##?\s)", content):
-                score = sum(token in chunk.lower() for token in tokens)
-                if score:
-                    matches.append({"source": path.name, "score": score, "content": chunk[:1200]})
-        matches.sort(key=lambda item: item["score"], reverse=True)
-        return {"matches": matches[:3]}
+        """Search Markdown via LlamaIndex BM25. Use keywords such as 휴가, 보안, 비용; cite sources."""
+        return index.search(query)
 
     return [calculator, search_knowledge]

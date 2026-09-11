@@ -1,8 +1,9 @@
 # LangChain Agent
 
-## LangChain 기반 Agent 실행
+## LangChain + LlamaIndex 기반 Agent 실행
 
 실제 LangChain `create_agent` / LangGraph 실행 루프를 사용하는 모드를 추가했습니다.
+문서 검색은 LlamaIndex의 Markdown 파서와 BM25 인덱스를 사용합니다.
 설치·실행·설계·검증 안내는 [LangChain Agent 가이드](docs/langchain-agent.md)를 참고하세요.
 
 ```bash

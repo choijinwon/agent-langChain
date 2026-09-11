@@ -21,6 +21,14 @@ def build_agent(provider="demo", model=None, knowledge_dir=None, *, chat_model=N
         if provider == "demo":
             from .demo import DemoChatModel
             chat_model = DemoChatModel()
+        elif provider == "ollama":
+            from langchain_ollama import ChatOllama
+            chat_model = ChatOllama(
+                model=model or os.getenv("OLLAMA_MODEL", "qwen3:latest"),
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+                temperature=0, reasoning=False, num_ctx=8192, num_predict=1024,
+                client_kwargs={"timeout": 180},
+            )
         elif provider == "openai":
             if not os.getenv("OPENAI_API_KEY"):
                 raise ValueError("openai 모드에는 OPENAI_API_KEY 환경 변수가 필요합니다.")

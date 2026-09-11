@@ -24,7 +24,9 @@ flowchart LR
 - `agent_langchain/demo.py`: API 없이 재현 가능한 규칙 기반 테스트 모델
 - `agent_langchain/cli.py`: 단일 요청 및 대화형 실행
 
-기존 Native Agent의 HTTP API와 웹 화면은 기존 런타임을 사용합니다. 새 LangChain 모드는 별도 CLI입니다.
+웹 화면은 승인·영속 메모리·추적을 제공하는 Native 런타임을 사용합니다.
+Ollama 모드에서는 LangChain ChatOllama 모델 어댑터와 LlamaIndex 검색을 연결합니다.
+별도 LangChain CLI는 `create_agent`가 도구 실행 루프를 관리합니다.
 LangChain 모드에는 읽기 도구만 연결되어 있으며 기존 할 일 생성·쓰기 승인 기능은 Native 모드에 있습니다.
 
 ## 설치
@@ -96,8 +98,40 @@ python -m agent_native.evaluation
 ### 확인한 실행 결과
 
 - Python 3.14.6, LangChain 1.4.0, LangGraph 1.2.11, langchain-openai 1.6.2 환경에서 검증
-- 테스트 18개 통과(LangChain·LlamaIndex 통합 테스트 12개 + 기존 테스트 6개)
+- 테스트 21개 통과(LangChain·LlamaIndex·Ollama 어댑터 테스트 15개 + 기존 테스트 6개)
 - 기존 Native Agent 평가 3/3 통과
 - 복합 요청 CLI에서 계산 결과 `5376`, 휴가 정책 및 `employee-handbook.md` 출처 확인
 - LlamaIndex core 0.14.24, BM25 retriever 0.6.5 환경에서 검색 순위·문서 변경·삭제·빈 문서 검증
-- 외부 LLM 호출은 API 키가 없는 환경이므로 미검증
+- OpenAI 호출은 API 키가 없는 환경이므로 미검증
+- 실제 로컬 LLM `qwen3:latest`로 6/6 평가 통과: 계산·추적, 검색·출처, 영속 메모리 회상, 승인 후 생성, 거절, LangChain 복합 요청
+
+
+## Ollama로 화면에서 사용하기
+
+설치된 도구 호출 지원 모델을 사용합니다. 이 환경에서는 `qwen3:latest`로 검증했습니다.
+Ollama 서버가 실행 중이어야 합니다. 기본 주소는 `http://127.0.0.1:11434`입니다.
+
+```bash
+python -m pip install -e '.[langchain]'
+export AGENT_PROVIDER=ollama
+export OLLAMA_MODEL=qwen3:latest
+export AGENT_PORT=8091
+python -m agent_native
+```
+
+`http://127.0.0.1:8091`에서 Operations Copilot을 엽니다. 헤더에 실제 공급자와 모델이 표시됩니다.
+계산, 정책 검색, 이름 기억, 승인형 할 일 생성을 사용할 수 있습니다. 현재 할 일은 외부 업무 서비스가
+아닌 로컬 JSON 목록에 저장됩니다. 사용자 메모와 세션, 승인, 실행 기록도 로컬 JSON에 저장됩니다.
+웹 런타임은 한 모델 응답당 도구 하나를 처리합니다. 모델이 여러 도구를 동시에 반환하면
+일부만 실행하지 않고 오류로 종료합니다. 독립된 작업을 하나씩 요청하세요.
+
+별도 LangChain CLI에서는 복합 도구 호출도 가능합니다.
+
+```bash
+python -m agent_langchain --provider ollama '휴가 정책을 찾고 128 * 42를 계산해줘' --json
+python -m agent_langchain.evaluate_ollama
+```
+
+실제 모델 평가는 임시 폴더에서 실행되어 사용자 할 일과 메모리를 변경하지 않습니다.
+모델 출력은 실행 환경과 버전에 따라 달라질 수 있습니다. 이번 검증 중 저장된 이름을 잘못 답한
+문제를 발견하여 사용자 메모를 우선 참조하는 시스템 지침을 보강한 뒤 전체 평가를 통과했습니다.

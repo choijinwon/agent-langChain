@@ -9,7 +9,7 @@ native-agent = "agent_native.api:main"
 langchain-agent = "agent_langchain.cli:main"
 
 [project.optional-dependencies]
-langchain = ["langchain>=1.0,<2", "langchain-openai>=1.0,<2", "llama-index-core>=0.14.24,<0.15", "llama-index-retrievers-bm25>=0.6.5,<0.7"]
+langchain = ["langchain>=1.0,<2", "langchain-openai>=1.0,<2", "langchain-ollama>=1.1,<2", "llama-index-core>=0.14.24,<0.15", "llama-index-retrievers-bm25>=0.6.5,<0.7"]
 
 [build-system]
 requires = ["setuptools>=68"]

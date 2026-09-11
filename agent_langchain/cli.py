@@ -6,7 +6,7 @@ import sys
 def main():
     parser = argparse.ArgumentParser(description="LangChain 계산·문서 검색 Agent")
     parser.add_argument("message", nargs="?", help="생략하면 대화 모드")
-    parser.add_argument("--provider", choices=["demo", "openai"], default="demo")
+    parser.add_argument("--provider", choices=["demo", "openai", "ollama"], default="demo")
     parser.add_argument("--model")
     parser.add_argument("--knowledge-dir")
     parser.add_argument("--session", default="default")

@@ -20,12 +20,13 @@ class Settings:
     data_dir: Path = _path_from_env("AGENT_DATA_DIR", "./data")
     knowledge_dir: Path = _path_from_env("AGENT_KNOWLEDGE_DIR", "./knowledge")
     max_steps: int = int(os.getenv("AGENT_MAX_STEPS", "6"))
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:latest")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 
     def validate(self) -> None:
-        if self.provider not in {"demo", "openai"}:
-            raise ValueError("AGENT_PROVIDER must be 'demo' or 'openai'")
+        if self.provider not in {"demo", "openai", "ollama"}:
+            raise ValueError("AGENT_PROVIDER must be 'demo', 'openai' or 'ollama'")
         if self.provider == "openai" and not self.api_key:
             raise ValueError("OPENAI_API_KEY is required when AGENT_PROVIDER=openai")
         if not 1 <= self.max_steps <= 20:
             raise ValueError("AGENT_MAX_STEPS must be between 1 and 20")
-

@@ -91,8 +91,9 @@ async function resolveApproval(id, approved, card) {
 async function loadConfig() {
   try {
     const config = await request('/api/config');
-    $('#provider-name').textContent = config.provider === 'demo' ? 'Demo Runtime' : 'OpenAI Runtime';
+    $('#provider-name').textContent = ({demo: 'Demo Runtime', openai: 'OpenAI Runtime', ollama: 'Ollama · 로컬 AI'})[config.provider] || config.provider;
     $('#model-name').textContent = config.model;
+    $('#runtime-label').textContent = `도구 · 승인 · 메모리 · 추적 · ${config.provider === 'ollama' ? 'Ollama ' + config.model : config.provider}`;
   } catch (_) {}
 }
 
@@ -125,4 +126,3 @@ $('#new-chat').onclick = () => { state.sessionId = crypto.randomUUID(); state.la
 $('#trace-button').onclick = showTrace;
 $('#trace-close').onclick = () => $('#trace-panel').classList.remove('open');
 loadConfig(); loadSessions(); prompt.focus();
-

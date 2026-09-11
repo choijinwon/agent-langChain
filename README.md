@@ -16,7 +16,14 @@ python -m agent_langchain '휴가 정책을 찾고 128 * 42를 계산해줘' --j
 기본 데모는 규칙 기반 모델이며, 계산과 검색 도구는 LangChain을 통해 실제 실행됩니다.
 자연어로 도구를 선택·조합하는 실제 LLM 실행은 `--provider openai`를 사용합니다.
 
-## 함께 제공하는 Native Agent
+## Ollama로 Operations Copilot 화면 실행
+
+```bash
+AGENT_PROVIDER=ollama OLLAMA_MODEL=qwen3:latest AGENT_PORT=8091 python -m agent_native
+```
+
+Ollama가 실행 중이면 `http://127.0.0.1:8091`에서 로컬 AI를 사용할 수 있습니다.
+LangChain ChatOllama + LlamaIndex 검색을 연결했으며, 도구·승인·메모리·추적을 실제 모델로 검증했습니다.
 
 기업 환경에서 확장할 수 있는 **에이전트 런타임 MVP**입니다. 모델이 단순히 답변만 생성하는 대신 도구를 선택하고 실행하며, 부작용이 있는 작업은 사람의 승인을 받은 뒤 이어서 처리합니다.
 

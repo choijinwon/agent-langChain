@@ -25,7 +25,15 @@ def build_runtime(settings: Settings) -> AgentRuntime:
     settings.validate()
     store = JsonStateStore(settings.data_dir / "state.json")
     tools = ToolRegistry(store, settings.knowledge_dir)
-    if settings.provider == "openai":
+    if settings.provider == "ollama":
+        from .ollama_provider import OllamaProvider
+        from agent_langchain.knowledge import KnowledgeIndex
+        from dataclasses import replace
+        index = KnowledgeIndex(settings.knowledge_dir)
+        search = tools.get("search_knowledge")
+        tools.register(replace(search, handler=lambda args, context: index.search(args["query"])))
+        provider = OllamaProvider(settings.ollama_model, settings.ollama_base_url)
+    elif settings.provider == "openai":
         provider = OpenAIResponsesProvider(
             api_key=settings.api_key or "", model=settings.model, base_url=settings.base_url
         )
@@ -45,7 +53,8 @@ def make_handler(runtime: AgentRuntime, settings: Settings):
             elif path == "/api/config":
                 self._json({
                     "provider": runtime.provider.name,
-                    "model": settings.model if runtime.provider.name == "openai" else "local-demo-planner",
+                    "model": settings.ollama_model if runtime.provider.name == "ollama" else (
+                        settings.model if runtime.provider.name == "openai" else "local-demo-planner"),
                     "tools": [
                         {"name": spec["name"], "description": spec["description"]}
                         for spec in runtime.tools.specs()
@@ -149,4 +158,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

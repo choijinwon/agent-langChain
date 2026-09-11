@@ -123,3 +123,38 @@ class LangChainAgentTests(unittest.TestCase):
             ask(self.agent, " ")
         with self.assertRaises(ValueError):
             ask(self.agent, "안녕", max_steps=0)
+
+    def test_ollama_adapter_preserves_tool_results(self):
+        from agent_native.ollama_provider import OllamaProvider
+        with patch("agent_native.ollama_provider.ChatOllama") as factory:
+            factory.return_value.bind_tools.return_value.invoke.return_value = AIMessage(content="거절했습니다.")
+            provider = OllamaProvider()
+            turn = provider.generate([
+                {"role": "user", "content": "할 일 생성"},
+                {"type": "function_call", "call_id": "c1", "name": "create_task", "arguments": '{"title":"test","due":null}'},
+                {"type": "function_call_output", "call_id": "c1", "output": '{"denied":true}'},
+            ], [], "지침")
+            messages = factory.return_value.bind_tools.return_value.invoke.call_args.args[0]
+            self.assertEqual(messages[-1].tool_call_id, "c1")
+            self.assertEqual(json.loads(messages[-1].content), {"denied": True})
+            self.assertEqual(turn.text, "거절했습니다.")
+
+    def test_ollama_adapter_rejects_batches_before_execution(self):
+        from agent_native.ollama_provider import OllamaProvider
+        from agent_native.providers import ProviderError
+        with patch("agent_native.ollama_provider.ChatOllama") as factory:
+            factory.return_value.bind_tools.return_value.invoke.return_value = AIMessage(content="", tool_calls=[
+                {"id": str(i), "name": "create_task", "args": {"title": "test", "due": None}}
+                for i in range(2)
+            ])
+            with self.assertRaises(ProviderError):
+                OllamaProvider().generate([], [], "지침")
+
+    def test_ollama_adapter_connection_error_is_normalized(self):
+        from agent_native.ollama_provider import OllamaProvider
+        from agent_native.providers import ProviderError
+        with patch("agent_native.ollama_provider.ChatOllama") as factory:
+            factory.return_value.bind_tools.return_value.invoke.side_effect = ConnectionError("private request")
+            with self.assertRaises(ProviderError) as error:
+                OllamaProvider().generate([], [], "지침")
+            self.assertNotIn("private request", str(error.exception))

@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import Settings
+from .model_selection import ModelRouter, list_models
 from .models import new_id
 from .providers import DemoProvider, OpenAIResponsesProvider
 from .runtime import AgentRuntime
@@ -43,6 +44,7 @@ def build_runtime(settings: Settings) -> AgentRuntime:
 
 
 def make_handler(runtime: AgentRuntime, settings: Settings):
+    router = ModelRouter(runtime, settings)
     class Handler(BaseHTTPRequestHandler):
         server_version = "NativeAgent/0.1"
 
@@ -60,6 +62,11 @@ def make_handler(runtime: AgentRuntime, settings: Settings):
                         for spec in runtime.tools.specs()
                     ],
                 })
+            elif path == "/api/models":
+                try:
+                    self._json({"models": list_models(settings), "default_model": router.default_model})
+                except ValueError as exc:
+                    self._json({"error": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
             elif path == "/api/sessions":
                 self._json({"sessions": runtime.store.list_sessions()})
             elif path == "/api/tasks":
@@ -76,17 +83,18 @@ def make_handler(runtime: AgentRuntime, settings: Settings):
                 body = self._body()
                 if path == "/api/chat":
                     session_id = str(body.get("session_id") or new_id("session"))
-                    reply = runtime.chat(
+                    reply = router.chat(
                         session_id=session_id,
                         message=str(body.get("message") or ""),
                         user_id=str(body.get("user_id") or "local-user"),
+                        model=body.get("model"),
                     )
                     self._json(reply.to_dict())
                 elif path.startswith("/api/approvals/"):
                     approval_id = path.rsplit("/", 1)[-1]
                     if type(body.get("approved")) is not bool:
                         raise ValueError("approved must be a boolean")
-                    self._json(runtime.approve(approval_id, body["approved"]).to_dict())
+                    self._json(router.approve(approval_id, body["approved"]).to_dict())
                 else:
                     self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
             except (ValueError, KeyError) as exc:

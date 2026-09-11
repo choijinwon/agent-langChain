@@ -2,6 +2,9 @@ const state = {
   sessionId: localStorage.getItem('native-agent-session') || crypto.randomUUID(),
   lastRunId: null,
   busy: false,
+  model: null,
+  provider: null,
+  loadingModels: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -51,21 +54,21 @@ async function request(path, options = {}) {
 }
 
 async function submitMessage(text) {
-  if (!text.trim() || state.busy) return;
-  state.busy = true; send.disabled = true;
+  if (!text.trim() || state.busy || state.loadingModels || !state.model) return;
+  state.busy = true; syncControls();
   addMessage('user', text.trim());
   prompt.value = ''; resizePrompt();
   const thinking = addMessage('agent', '처리 중<span class="dots"><span>.</span><span>.</span><span>.</span></span>', 'thinking');
   thinking.querySelector('.bubble').innerHTML = '처리 중<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
   try {
-    const reply = await request('/api/chat', {method:'POST', body:JSON.stringify({session_id:state.sessionId, message:text})});
+    const reply = await request('/api/chat', {method:'POST', body:JSON.stringify({session_id:state.sessionId, message:text, model:state.model})});
     thinking.remove(); handleReply(reply);
     localStorage.setItem('native-agent-session', state.sessionId);
     loadSessions();
   } catch (error) {
     thinking.remove(); addMessage('agent', `오류: ${error.message}`);
   } finally {
-    state.busy = false; send.disabled = false; prompt.focus();
+    state.busy = false; syncControls(); prompt.focus();
   }
 }
 
@@ -91,6 +94,7 @@ async function resolveApproval(id, approved, card) {
 async function loadConfig() {
   try {
     const config = await request('/api/config');
+    state.provider = config.provider;
     $('#provider-name').textContent = ({demo: 'Demo Runtime', openai: 'OpenAI Runtime', ollama: 'Ollama · 로컬 AI'})[config.provider] || config.provider;
     $('#model-name').textContent = config.model;
     $('#runtime-label').textContent = `도구 · 승인 · 메모리 · 추적 · ${config.provider === 'ollama' ? 'Ollama ' + config.model : config.provider}`;
@@ -110,7 +114,7 @@ async function showTrace() {
   if (!state.lastRunId) return;
   try {
     const run = await request(`/api/runs/${state.lastRunId}`);
-    $('#trace-summary').innerHTML = `<strong>${escapeHtml(run.status)}</strong> · ${escapeHtml(run.provider)}<br>${escapeHtml(run.id)}`;
+    $('#trace-summary').innerHTML = `<strong>${escapeHtml(run.status)}</strong> · ${escapeHtml(run.provider)} · ${escapeHtml(run.model || "")}<br>${escapeHtml(run.id)}`;
     $('#trace-events').innerHTML = run.events.map(event => `<div class="trace-event"><b>${escapeHtml(event.type)}</b><pre>${escapeHtml(JSON.stringify(event.data, null, 2))}</pre></div>`).join('');
     $('#trace-panel').classList.add('open');
     $('#trace-panel').setAttribute('aria-hidden','false');
@@ -125,4 +129,50 @@ document.querySelectorAll('[data-prompt]').forEach(button => button.onclick = ()
 $('#new-chat').onclick = () => { state.sessionId = crypto.randomUUID(); state.lastRunId = null; messages.innerHTML=''; welcome.hidden=false; $('#trace-button').disabled=true; localStorage.setItem('native-agent-session',state.sessionId); };
 $('#trace-button').onclick = showTrace;
 $('#trace-close').onclick = () => $('#trace-panel').classList.remove('open');
-loadConfig(); loadSessions(); prompt.focus();
+loadConfig().then(loadModels); loadSessions(); prompt.focus();
+
+function syncControls() {
+  send.disabled = state.busy || state.loadingModels || !state.model;
+  $('#model-select').disabled = state.busy || state.loadingModels || !state.model;
+  $('#refresh-models').disabled = state.busy || state.loadingModels;
+}
+function displayModel() {
+  $('#model-name').textContent = state.model || '선택 가능한 모델 없음';
+  $('#runtime-label').textContent = `도구 · 승인 · 메모리 · 추적 · ${state.provider || ''} ${state.model || ''}`;
+}
+async function loadModels() {
+  state.loadingModels = true; syncControls();
+  $('#model-status').textContent = '설치 모델 확인 중…';
+  try {
+    const data = await request('/api/models');
+    const select = $('#model-select');
+    select.replaceChildren();
+    for (const model of data.models) {
+      const option = document.createElement('option');
+      option.value = model.name;
+      option.textContent = `${model.name}${model.size_gb ? ' · ' + model.size_gb + ' GB' : ''}${model.available ? '' : ' · ' + model.reason}`;
+      option.disabled = !model.available;
+      select.appendChild(option);
+    }
+    const available = data.models.filter(model => model.available);
+    const saved = state.model || localStorage.getItem('copilot-model');
+    state.model = available.find(model => model.name === saved)?.name || available.find(model => model.name === data.default_model)?.name || available[0]?.name || null;
+    if (state.model) select.value = state.model;
+    else select.replaceChildren(new Option('사용 가능한 모델이 없습니다', ''));
+    $('#model-status').textContent = state.model ? `${available.length}개 사용 가능 · 다음 요청부터 적용` : 'Ollama에 도구 호출 지원 모델을 설치하세요.';
+    displayModel();
+  } catch (error) {
+    state.model = null;
+    $('#model-select').replaceChildren(new Option('모델 목록을 불러오지 못했습니다', ''));
+    $('#model-status').textContent = error.message;
+    displayModel();
+  } finally { state.loadingModels = false; syncControls(); }
+}
+$('#model-select').onchange = () => {
+  state.model = $('#model-select').value;
+  localStorage.setItem('copilot-model', state.model);
+  displayModel();
+  $('#model-status').textContent = '다음 요청부터 적용 · 승인 대기 작업은 원래 모델로 처리';
+};
+$('#refresh-models').onclick = loadModels;
+syncControls();

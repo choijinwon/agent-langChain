@@ -15,7 +15,7 @@ class OllamaProvider(ModelProvider):
     def __init__(self, model="qwen3:latest", base_url="http://127.0.0.1:11434"):
         self.model = model
         self.chat_model = ChatOllama(
-            model=model, base_url=base_url, temperature=0, reasoning=False,
+            model=model, base_url=base_url, temperature=0, reasoning=False if model.startswith("qwen3") else None,
             num_ctx=8192, num_predict=1024, client_kwargs={"timeout": 180},
         )
 

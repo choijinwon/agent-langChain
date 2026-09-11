@@ -96,3 +96,9 @@ button { cursor: pointer; }
 @keyframes blink { 0%,70%,100%{opacity:.25} 35%{opacity:1} }
 @media(max-width:760px){.app-shell{grid-template-columns:1fr}.sidebar{display:none}.icon-button{display:block}.suggestions{grid-template-columns:1fr}.conversation{padding-left:20px;padding-right:20px}.trace-panel{position:fixed;right:0;top:0;bottom:0;z-index:5;box-shadow:var(--shadow)}.composer-wrap{padding-left:14px;padding-right:14px}.topbar{padding:0 18px}}
 
+
+.model-controls { max-width:820px; margin:0 auto 8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+.model-controls select { flex:1; min-width:130px; max-width:300px; padding:8px; border:1px solid #dddfe5; border-radius:8px; background:white; color:var(--ink); }
+.model-controls button { padding:8px; border:1px solid #dddfe5; border-radius:8px; background:white; color:var(--ink); }
+#model-status { color:var(--muted); font-size:11px; }
+.conversation { padding-bottom:210px; }

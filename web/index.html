@@ -43,6 +43,12 @@
       </section>
 
       <div class="composer-wrap">
+        <div class="model-controls">
+          <label for="model-select">모델</label>
+          <select id="model-select" aria-label="AI 모델 선택" disabled><option>모델 불러오는 중…</option></select>
+          <button id="refresh-models" type="button" aria-label="모델 목록 새로고침">↻ 새로고침</button>
+          <span id="model-status" role="status"></span>
+        </div>
         <form id="composer" class="composer">
           <textarea id="prompt" rows="1" placeholder="Native Agent에게 요청하세요" aria-label="메시지"></textarea>
           <button id="send" type="submit" aria-label="전송">↑</button>

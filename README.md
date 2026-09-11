@@ -22,6 +22,7 @@ python -m agent_langchain '휴가 정책을 찾고 128 * 42를 계산해줘' --j
 AGENT_PROVIDER=ollama OLLAMA_MODEL=qwen3:latest AGENT_PORT=8091 python -m agent_native
 ```
 
+입력창 위 모델 메뉴에서 설치된 도구 호출 지원 모델을 선택하고 전환할 수 있습니다.
 Ollama가 실행 중이면 `http://127.0.0.1:8091`에서 로컬 AI를 사용할 수 있습니다.
 LangChain ChatOllama + LlamaIndex 검색을 연결했으며, 도구·승인·메모리·추적을 실제 모델로 검증했습니다.
 

@@ -45,6 +45,7 @@ class AgentRuntime:
             "session_id": session_id,
             "status": "running",
             "provider": self.provider.name,
+            "model": getattr(self.provider, "model", "local-demo-planner"),
             "started_at": now_iso(),
             "events": [],
         })
